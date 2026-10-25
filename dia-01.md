@@ -2,7 +2,7 @@
 No primeido dia, vamos criar nosso cluster para estudos. Ferramenta utilizada para criar VMs vai ser multipass da Canonical.
 
 ### Automação (opcional)
-Todo o passo a passo abaixo (criação das VMs, pré-configuração dos nós, init do control-plane, instalação do Cilium e join dos workers) está automatizado nos scripts em [`scripts/`](./scripts). Para rodar tudo de uma vez a partir do host:
+Todo o passo a passo abaixo (criação das VMs, pré-configuração dos nós, init do control-plane, instalação do Cilium e join dos workers) está automatizado nos scripts em [`scripts/`](./scripts). **Basta rodar o comando abaixo a partir do host** — não é necessário executar manualmente nenhum dos passos das seções seguintes, que ficam aqui apenas como referência de cada etapa:
 
 ```bash
 ./scripts/setup-cluster.sh
