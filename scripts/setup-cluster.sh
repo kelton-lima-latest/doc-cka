@@ -5,6 +5,10 @@
 # Se nenhum argumento for passado, usa CONTROL_PLANE_NAME/WORKER_NODES (env) ou os padrões abaixo.
 # Outras variáveis opcionais: K8S_VERSION, VM_CPUS, VM_MEMORY, VM_DISK, VM_IMAGE
 # DRY_RUN=1 imprime as ações sem executá-las (não transfere nem roda nada nas VMs).
+#
+# Depois do cluster pronto, se outros dispositivos da LAN precisarem acessar
+# serviços expostos (NodePort), rode manualmente (requer sudo e root no
+# host): scripts/05-lan-gateway.sh. Ver dia-04.md.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

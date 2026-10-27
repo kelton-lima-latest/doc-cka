@@ -3,9 +3,21 @@
 # Uso: ./01-provision-vms.sh [nome-control-plane] [nome-worker-1] [nome-worker-2] ...
 # Se nenhum argumento for passado, usa CONTROL_PLANE_NAME/WORKER_NODES (env) ou os padrões abaixo.
 # DRY_RUN=1 imprime as ações sem executá-las.
+#
+# VM_NETWORK=bridged ativa bridged networking (as VMs recebem IP direto na
+# LAN física, sem precisar de gateway NAT no host — ver dia-04.md). Requer:
+#   1. Uma interface de rede CABEADA conectada no host (`ip link` sem
+#      NO-CARRIER). Bridge para Wi-Fi não é suportado pelo multipass.
+#   2. `multipass set local.bridged-network=<interface>` configurado antes
+#      de rodar este script (`multipass networks` lista as interfaces
+#      elegíveis).
+# Sem VM_NETWORK definido, as VMs usam a rede NAT padrão do multipass (como
+# hoje), e o acesso de outros dispositivos da LAN depende do gateway NAT em
+# scripts/05-lan-gateway.sh.
 set -euo pipefail
 
 DRY_RUN="${DRY_RUN:-0}"
+VM_NETWORK="${VM_NETWORK:-}"
 
 run() {
   if [ "$DRY_RUN" = "1" ]; then
@@ -39,8 +51,13 @@ create_vm() {
     echo "VM '$name' já existe, pulando criação."
     return
   fi
-  echo "Criando VM '$name' (cpus=$VM_CPUS, memory=$VM_MEMORY, disk=$VM_DISK)..."
-  run multipass launch "$VM_IMAGE" --name "$name" --cpus "$VM_CPUS" --memory "$VM_MEMORY" --disk "$VM_DISK"
+  if [ "$VM_NETWORK" = "bridged" ]; then
+    echo "Criando VM '$name' (cpus=$VM_CPUS, memory=$VM_MEMORY, disk=$VM_DISK, network=bridged)..."
+    run multipass launch "$VM_IMAGE" --name "$name" --cpus "$VM_CPUS" --memory "$VM_MEMORY" --disk "$VM_DISK" --network bridged
+  else
+    echo "Criando VM '$name' (cpus=$VM_CPUS, memory=$VM_MEMORY, disk=$VM_DISK)..."
+    run multipass launch "$VM_IMAGE" --name "$name" --cpus "$VM_CPUS" --memory "$VM_MEMORY" --disk "$VM_DISK"
+  fi
 }
 
 create_vm "$CONTROL_PLANE_NAME"

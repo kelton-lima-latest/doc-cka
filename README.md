@@ -8,3 +8,5 @@ Este repositório contém a documentação prática para a certificação CKA (C
 
 [dia-03](https://github.com/kelton-lima-latest/doc-cka/blob/main/dia-03.md): Backup e Restore do etcd — Snapshot do cluster, instalação do etcdctl, geração de backup consistente e recuperação do datastore do Kubernetes após parada do kube-apiserver.
 
+[dia-04](https://github.com/kelton-lima-latest/doc-cka/blob/main/dia-04.md): Acesso da LAN aos serviços do cluster — Gateway NAT no host via `iptables`/systemd para expor serviços NodePort a outros dispositivos da rede, limitação de bridged networking com Wi-Fi e plano para usar bridge na próxima recriação do cluster.
+
