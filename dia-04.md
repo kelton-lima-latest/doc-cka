@@ -18,22 +18,26 @@ O script (idempotente, pode rodar de novo com valores diferentes):
 - Grava as regras de `iptables` (DNAT + FORWARD) em `/usr/local/sbin/k8s-lan-gateway.sh`.
 - Instala e habilita `k8s-lan-gateway.service` (systemd), para as regras sobreviverem a reboot.
 
-Variáveis (env, opcionais — padrão aponta para o NodePort atual do defectdojo no controlplane):
+Variáveis (env, opcionais — padrão aponta para o IP do MetalLB do Gateway, não para NodePort nem para o IP de uma VM específica):
 
-| Variável      | Padrão        | Descrição                                            |
-|---------------|---------------|-------------------------------------------------------|
-| `WAN_IF`      | `wlp3s0`      | Interface da LAN no notebook                          |
-| `WAN_PORT`    | `80`          | Porta que os outros dispositivos usam                 |
-| `TARGET_IP`   | `10.97.0.17`  | IP do node com o NodePort (controlplane)               |
-| `TARGET_PORT` | `30941`       | NodePort do serviço (ex.: `defectdojo-django`)         |
+| Variável      | Padrão         | Descrição                                                                 |
+|---------------|----------------|-----------------------------------------------------------------------------|
+| `WAN_IF`      | `wlp3s0`       | Interface da LAN no notebook                                                |
+| `WAN_PORT`    | `80`           | Porta que os outros dispositivos usam                                      |
+| `TARGET_IP`   | `10.97.0.240`  | IP do `Service` LoadBalancer do Gateway (MetalLB), não do NodePort nem do node |
+| `TARGET_PORT` | `80`           | Porta do Service (`kubectl get svc -n defectdojo cilium-gateway-platform-gateway`) |
 
-### Limitação importante: ALLOWED_HOSTS
+Evitar NodePort/IP do node como alvo foi intencional: NodePort muda se o Service for recriado, e o IP do node amarra o gateway a uma VM específica. A VIP do MetalLB é estável independente de qual node está rodando o Envoy.
 
-O gateway encaminha a porta, mas **não resolve nomes**. Serviços que validam o cabeçalho `Host` (ex.: Django `ALLOWED_HOSTS`, caso do DefectDojo — ver `apps/defectdojo/values.yaml` no repo `platform-tools`, `host: defectdojo.dev-k8s-note.local`) rejeitam acesso direto pelo IP do notebook com `400 DisallowedHost`.
+### Pegadinha real encontrada: ordem das regras no FORWARD
 
-Cada dispositivo da LAN ainda precisa resolver o hostname esperado para o IP do notebook na LAN, de uma destas formas:
-- Uma entrada em `/etc/hosts` (ou equivalente) apontando `defectdojo.dev-k8s-note.local` para o IP do notebook — mesmo princípio de hoje, mas agora aponta para o notebook (acessível por todos na LAN) em vez do IP interno da VM (só acessível pelo próprio notebook).
-- Ou configurar esse IP como servidor DNS do dispositivo/roteador (não implementado — exigiria dnsmasq no notebook + mudança no DHCP do roteador).
+O Multipass cria suas próprias regras na chain `FORWARD` do `iptables` pra cada rede NAT dele (`mpqemubrzone1/2/3` — aparecem como `/* generated for Multipass network ... */` em `iptables -L FORWARD`), incluindo um `REJECT` amplo pra qualquer tráfego de entrada nessas redes. Essas regras já existem **antes** de qualquer coisa que a gente adicione. Um `ACCEPT` anexado com `-A` (no fim da chain) nunca chega a ser avaliado — o `REJECT` do Multipass intercepta primeiro. Sintoma: `DNAT` aplicado corretamente (confirmado via contador de pacotes em `iptables -t nat -L PREROUTING -v`), mas `ERR_CONNECTION_REFUSED` do lado de fora mesmo assim.
+
+Correção: `scripts/05-lan-gateway.sh` usa `-I FORWARD 1` (insere no topo) em vez de `-A` pras regras de ACCEPT, garantindo que rodem antes das regras do Multipass.
+
+### ALLOWED_HOSTS — resolvido no lado do app, não aqui
+
+O gateway encaminha a porta e não resolve nomes — serviços que validam o cabeçalho `Host` (Django `ALLOWED_HOSTS`) rejeitariam acesso pelo IP com `400 DisallowedHost`. Em vez de exigir `/etc/hosts` por dispositivo (o que o objetivo original era evitar), a correção foi no app: `apps/defectdojo/values.yaml` (`alternativeHosts: ["*"]`) e `apps/defectdojo/manifests/httproute.yaml` (sem `hostnames`) no repo `platform-tools`, fazendo o DefectDojo aceitar qualquer `Host`. Outros serviços expostos por esse gateway que não tiverem esse ajuste ainda vão precisar de hostname resolvido por dispositivo.
 
 ### Observação
 
